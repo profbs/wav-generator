@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WAV Generator</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d0d0d;
+      color: #e0e0e0;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .terminal {
+      width: 100%;
+      max-width: 620px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    .terminal-bar {
+      background: #1c1c1c;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red    { background: #ff5f57; }
+    .dot-yellow { background: #febc2e; }
+    .dot-green  { background: #28c840; }
+
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+      letter-spacing: 0.05em;
+    }
+
+    .terminal-body {
+      padding: 28px 32px 32px;
+    }
+
+    .prompt-line {
+      color: #4ade80;
+      font-size: 13px;
+      margin-bottom: 24px;
+      letter-spacing: 0.03em;
+    }
+
+    .prompt-line span { color: #888; }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: #4ade80;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    label::before { content: '> '; color: #444; }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      background: #0d0d0d;
+      border: 1px solid #2a2a2a;
+      border-radius: 4px;
+      color: #e0e0e0;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 13px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      border-color: #4ade80;
+    }
+
+    input::placeholder { color: #3a3a3a; }
+
+    .hint {
+      font-size: 11px;
+      color: #444;
+      margin-top: 4px;
+    }
+
+    .generate-btn {
+      margin-top: 24px;
+      width: 100%;
+      background: transparent;
+      border: 1px solid #4ade80;
+      color: #4ade80;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      font-size: 13px;
+      padding: 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .generate-btn:hover { background: #4ade80; color: #0d0d0d; }
+    .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .generate-btn:disabled:hover { background: transparent; color: #4ade80; }
+
+    .output {
+      margin-top: 24px;
+      border-top: 1px solid #1e1e1e;
+      padding-top: 20px;
+      display: none;
+    }
+
+    .output-line {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #1a1a1a;
+      font-size: 12px;
+    }
+
+    .file-item:last-child { border-bottom: none; }
+
+    .file-name { color: #e0e0e0; }
+
+    .download-link {
+      color: #4ade80;
+      text-decoration: none;
+      letter-spacing: 0.05em;
+    }
+
+    .download-link:hover { text-decoration: underline; }
+
+    .error-msg {
+      color: #f87171;
+      font-size: 12px;
+      margin-top: 16px;
+    }
+
+    .spinner {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { content: '|'; }
+    }
+
+    .status { font-size: 12px; color: #888; margin-top: 16px; }
+    .status.loading::after {
+      content: '';
+      animation: dots 1.2s steps(4, end) infinite;
+    }
+    @keyframes dots {
+      0%   { content: ''; }
+      25%  { content: '.'; }
+      50%  { content: '..'; }
+      75%  { content: '...'; }
+      100% { content: ''; }
+    }
+  </style>
+</head>
+<body>
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span class="dot dot-red"></span>
+      <span class="dot dot-yellow"></span>
+      <span class="dot dot-green"></span>
+      <span class="terminal-title">wav-generator</span>
+    </div>
+    <div class="terminal-body">
+      <div class="prompt-line">$ wav-generator <span>--interactive</span></div>
+
+      <form id="gen-form">
+        <div class="field">
+          <label for="base_filename">base filename</label>
+          <input type="text" id="base_filename" name="base_filename" value="sample_audio" placeholder="sample_audio" />
+        </div>
+
+        <div class="field">
+          <label for="num_files">number of tracks</label>
+          <input type="number" id="num_files" name="num_files" value="1" min="1" max="20" />
+        </div>
+
+        <div class="field">
+          <label for="first_duration">first file duration</label>
+          <input type="number" id="first_duration" name="first_duration" value="10" min="1" />
+          <div class="hint">in seconds</div>
+        </div>
+
+        <div class="field">
+          <label for="duration_increment">duration increment</label>
+          <input type="number" id="duration_increment" name="duration_increment" value="1000" min="0" />
+          <div class="hint">in milliseconds — added to each subsequent file</div>
+        </div>
+
+        <button type="submit" class="generate-btn" id="gen-btn">[ generate ]</button>
+      </form>
+
+      <div class="status" id="status"></div>
+      <div class="error-msg" id="error-msg"></div>
+
+      <div class="output" id="output">
+        <div class="output-line" id="output-label"></div>
+        <div id="file-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('gen-form');
+    const btn = document.getElementById('gen-btn');
+    const status = document.getElementById('status');
+    const errorMsg = document.getElementById('error-msg');
+    const output = document.getElementById('output');
+    const outputLabel = document.getElementById('output-label');
+    const fileList = document.getElementById('file-list');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      status.textContent = 'generating';
+      status.classList.add('loading');
+      errorMsg.textContent = '';
+      output.style.display = 'none';
+      fileList.innerHTML = '';
+
+      const data = new FormData(form);
+
+      try {
+        const res = await fetch('/generate', { method: 'POST', body: data });
+        const json = await res.json();
+
+        if (json.error) {
+          errorMsg.textContent = '! ' + json.error;
+        } else {
+          outputLabel.textContent = `// generated ${json.files.length} file${json.files.length > 1 ? 's' : ''}`;
+          json.files.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            item.innerHTML = `
+              <span class="file-name">${f.filename}</span>
+              <a class="download-link" href="${f.url}" download="${f.filename}">[download]</a>
+            `;
+            fileList.appendChild(item);
+          });
+          output.style.display = 'block';
+
+          // Trigger downloads automatically
+          json.files.forEach((f, i) => {
+            setTimeout(() => {
+              const a = document.createElement('a');
+              a.href = f.url;
+              a.download = f.filename;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }, i * 300);
+          });
+        }
+      } catch (err) {
+        errorMsg.textContent = '! unexpected error — try again';
+      } finally {
+        status.classList.remove('loading');
+        status.textContent = '';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
